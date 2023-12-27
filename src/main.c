@@ -2,18 +2,32 @@
 #include <curses.h>
 #include <ncurses.h>
 
-typedef struct Player {
-    int xPos, yPos, health;
-} Player;
+typedef struct Position {
+    int y, x;
+} Position;
 
-int screenSetup();
-int mapSetup();
-Player* playerSetup();
-int handleInput(int input, Player* player);
-int playerMove(int y, int x, Player* player);
+typedef struct Room {
+    Position position;
+    int width, height;
+} Room;
+
+typedef struct Entity {
+    Position position;
+    int health;
+} Entity;
+
+void screenSetup();
+Room** mapSetup();
+Entity* playerSetup();
+void handleInput(int input, Entity* player);
+void playerMove(int y, int x, Entity* player);
+void checkPosition(int targetY, int targetX, Entity* player);
+
+Room* createRoom(int y, int x, int height, int width);
+void drawRoom(Room* room);
 
 int main() {
-    Player* player;
+    Entity* player;
     int ch;
 
     screenSetup();
@@ -31,75 +45,124 @@ int main() {
     return 0;
 }
 
-int screenSetup() {
+void screenSetup() {
     initscr();
     printw("Hell world");
     noecho();
     refresh();
-    
-    return 1;
 }
 
-int mapSetup() {
-   mvprintw(13, 13, "--------"); 
-   mvprintw(14, 13, "|......|"); 
-   mvprintw(15, 13, "|......|"); 
-   mvprintw(16, 13, "|......|"); 
-   mvprintw(17, 13, "|......|"); 
-   mvprintw(18, 13, "--------"); 
+Room** mapSetup() {
+    Room** rooms;
 
-   mvprintw(2, 40, "--------"); 
-   mvprintw(3, 40, "|......|"); 
-   mvprintw(4, 40, "|......|"); 
-   mvprintw(5, 40, "|......|"); 
-   mvprintw(6, 40, "|......|"); 
-   mvprintw(7, 40, "--------"); 
+    rooms[0] = createRoom(13, 13, 6, 8);
+    drawRoom(rooms[0]);
 
-   mvprintw(13, 40, "----------"); 
-   mvprintw(14, 40, "|........|"); 
-   mvprintw(15, 40, "|........|"); 
-   mvprintw(16, 40, "|........|"); 
-   mvprintw(17, 40, "|........|"); 
-   mvprintw(18, 40, "----------"); 
+    rooms[1] = createRoom(2, 40, 6, 8);
+    drawRoom(rooms[1]);
+
+    rooms[2] = createRoom(10, 40, 6, 12);
+    drawRoom(rooms[2]);
+
+    return rooms;
 }
 
-Player* playerSetup() {
-    Player* player = malloc(sizeof(Player));
+Room* createRoom(int y, int x, int height, int width) {
+    Room* room;
+    room = malloc(sizeof(Room));
 
-    player->xPos = 14;
+    room->yPos = y;
+    room->xPos = x;
+    room->height = height;
+    room->width = width;
+
+    return room;
+}
+
+void drawRoom(Room* room) {
+    int y, x;
+
+    /* draw top and bottom */
+    for (x = room->xPos; x < room->xPos + room->width; x++) {
+        mvprintw(room->yPos, x, "-");
+        mvprintw(room->yPos + room->height - 1, x, "-");
+    }
+
+    /* draw floors and side walls */
+    for (y = room->yPos + 1; y < room->yPos + room->height - 1; y++) {
+        mvprintw(y, room->xPos, "|");
+        mvprintw(y, room->xPos + room->width -1, "|");
+        for (x = room->xPos +1; x < room->xPos + room->width - 1; x++) {
+            mvprintw(y, x, ".");
+        }
+    }
+}
+
+Entity* playerSetup() {
+    Entity* player = malloc(sizeof(Entity));
+
     player->yPos = 14;
+    player->xPos = 14;
     player->health = 20;
 
-    mvprintw(player->yPos, player->xPos, "@");
+    playerMove(14, 14, player);
 
     return player;
 }
 
-int handleInput(int input, Player* player) {
+void handleInput(int input, Entity* player) {
+    int targetY, targetX;
+
     switch (input) {
         /* move up, down, left, right */
         case 'w':
-            playerMove(player->yPos - 1, player->xPos, player);
+            targetY = player->yPos - 1;
+            targetX = player->xPos;
             break;
+
         case 's':
-            playerMove(player->yPos + 1, player->xPos, player);
+            targetY = player->yPos + 1;
+            targetX = player->xPos;
             break;
+
         case 'a':
-            playerMove(player->yPos, player->xPos - 1, player);
+            targetY = player->yPos;
+            targetX = player->xPos - 1;
             break;
+
         case 'd':
-            playerMove(player->yPos, player->xPos + 1, player);
+            targetY = player->yPos;
+            targetX = player->xPos + 1;
             break;
+
         default:
             break;
     }
+
+    checkPosition(targetY, targetX, player);
 }
 
-int playerMove(int y, int x, Player* player) {
+void playerMove(int y, int x, Entity* player) {
     mvprintw(player->yPos, player->xPos, ".");
 
     player->yPos = y;
     player->xPos = x;
 
     mvprintw(player->yPos, player->xPos, "@");
+    move(player->yPos, player->xPos);
 }
+
+void checkPosition(int targetY, int targetX, Entity* entity) {
+    int tile;
+    switch (mvinch(targetY, targetX)) {
+        case '.':
+            playerMove(targetY, targetX, entity);
+            break;
+
+        default:
+            move(entity->yPos, entity->xPos);
+            break;
+    
+    }
+}
+
